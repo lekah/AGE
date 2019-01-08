@@ -1,7 +1,6 @@
-import unittest
 
-from age.rules import (UpdateRule, RuleSequence, get_entity_sets, MODES,
-        RuleSaveWalkers, RuleSetWalkers)
+from age.entities import get_entity_sets
+from age.rules import (UpdateRule, RuleSequence, MODES, RuleSaveWalkers, RuleSetWalkers)
 
 from aiida.backends.testbase import AiidaTestCase, check_if_tests_can_run
 from aiida.common.exceptions import TestsNotAllowedError
@@ -13,6 +12,8 @@ from aiida.orm.node.process import CalculationNode, WorkflowNode
 from aiida.utils.ascii_vis import draw_children
 
 import numpy as np
+import unittest
+
 
 class TestNodes(AiidaTestCase):
     # Hardcoding here how deep I go

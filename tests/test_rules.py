@@ -9,9 +9,9 @@ from aiida.orm import Node
 from aiida.orm.data import Data
 from aiida.orm.node.process import CalculationNode, WorkflowNode
 
-from aiida.utils.ascii_vis import draw_children
 
 import numpy as np
+
 
 
 class TestNodes(AiidaTestCase):
@@ -31,71 +31,26 @@ class TestNodes(AiidaTestCase):
         Creating a parent (Data) node.
         Attaching a sequence of Calculation/Data to create a "provenance".
         """
-        parent = Data().store() # This is the ancestor of every Node I create later
-
-        desc_dict = {} # This where I save the descendants, by depth (depth is the key).
-        # I'm including original node as a descendant of depth 0.
-        desc_dict[0] = set([parent.id])
-
-        previous_cls = Data # The previous_cls is needed to be able to alternate
-        # between Data and Calculations.
-        # If previous_cls is Data, add calculations, and vice versa
-        previous_ins = [parent] # The previous_ins list stores all the instance created
-        # in the provenance level above.
-
-        # all_instances saves all the instances EVER created"
-        all_instances = set([parent.id])
-        # Iterating over the depth of the tree
-        for depth in range(1, self.DEPTH):
-            # I'm at new depth, create new set:
-            desc_dict[depth] = set()
-
-            # Here I decide what class to create this level of descendants, and what the
-            # link type is:
-            cls = Data if previous_cls is CalculationNode else CalculationNode
-            ltype = LinkType.CREATE if cls is Data else LinkType.INPUT_CALC
-
-            # The new instances I create are saved in this list:
-            new_ins = []
-
-            # Iterating over previous instances
-            for pins in previous_ins:
-                # every previous instances gets a certain number of children:
-                for idesc in range(self.NR_OF_CHILDREN):
-                    new = cls().store()
-                    new.add_incoming(pins, link_type=ltype, link_label='{}'.format(idesc))
-                    new_ins.append(new)
-                    all_instances.add(new.id)
-                    desc_dict[depth].add(new.id)
-            # Everything done, loading new instances to previous instances, and previous class
-            # to this class:
-            previous_ins = new_ins
-            previous_cls = cls
-
+        from age.utils import create_tree
+        parent, desc_dict, _ = create_tree(self.DEPTH, self.NR_OF_CHILDREN)
         # Created all the nodes, tree. 
-        print('\n\n\n The tree created:')
-        print(draw_children(
-                parent,
-                dist=self.DEPTH+1,
-                follow_links_of_type=(LinkType.INPUT_CALC, LinkType.CREATE)))
-        print('\n\n\n')
         #Now testing whether I find all the descendants
         # Using the utility function to create the starting entity set:
         es = get_entity_sets(node_ids=(parent.id,))
         qb = QueryBuilder().append(Node).append(Node)
 
         for depth in range(0, self.DEPTH):
-            print('At depth {}'.format(depth))
+            #print('At depth {}'.format(depth))
 
             rule = UpdateRule(qb, mode=MODES.REPLACE, max_iterations=depth)
             res = rule.run(es.copy())['nodes']._set
-            print('   Replace-mode results: {}'.format(', '.join(map(str, sorted(res)))))
+            #print('   Replace-mode results: {}'.format(', '.join(map(str, sorted(res)))))
             should_set = desc_dict[depth]
             self.assertTrue(not(res.difference(should_set) or should_set.difference(res)))
 
             rule = UpdateRule(qb, mode=MODES.APPEND, max_iterations=depth)
             res = rule.run(es.copy())['nodes']._set
-            print('   Append-mode  results: {}'.format(', '.join(map(str, sorted(res)))))
+            #print('   Append-mode  results: {}'.format(', '.join(map(str, sorted(res)))))
             should_set = set()
             [[should_set.add(s) for s in desc_dict[d]] for d in range(depth+1)]
 

@@ -12,13 +12,13 @@ from aiida.orm.node.process import CalculationNode, WorkflowNode
 from aiida.utils.ascii_vis import draw_children
 
 import numpy as np
-import unittest
 
 
 class TestNodes(AiidaTestCase):
     # Hardcoding here how deep I go
     DEPTH = 4
-    # Hardcoding the branching at every level, i.e. the number of children per parent Node.
+    # Hardcoding the branching at every level, i.e. the number
+    # of children per parent Node.
     NR_OF_CHILDREN = 2
 
     def runTest(self):
@@ -37,8 +37,9 @@ class TestNodes(AiidaTestCase):
         # I'm including original node as a descendant of depth 0.
         desc_dict[0] = set([parent.id])
 
-        previous_cls = Data # The previous_cls is needed to be able to alternate between Data and
-        # Calculations. If previous_cls is Data, add calculations, and vice versa
+        previous_cls = Data # The previous_cls is needed to be able to alternate
+        # between Data and Calculations.
+        # If previous_cls is Data, add calculations, and vice versa
         previous_ins = [parent] # The previous_ins list stores all the instance created
         # in the provenance level above.
 
@@ -73,7 +74,10 @@ class TestNodes(AiidaTestCase):
 
         # Created all the nodes, tree. 
         print('\n\n\n The tree created:')
-        print(draw_children(parent, dist=self.DEPTH+1, follow_links_of_type=(LinkType.INPUT_CALC, LinkType.CREATE)))
+        print(draw_children(
+                parent,
+                dist=self.DEPTH+1,
+                follow_links_of_type=(LinkType.INPUT_CALC, LinkType.CREATE)))
         print('\n\n\n')
         #Now testing whether I find all the descendants
         # Using the utility function to create the starting entity set:
@@ -126,17 +130,22 @@ class TestNodes(AiidaTestCase):
         for i in range(3):
             data_in = Data().store()
             dins.add(data_in.id)
-            c.add_incoming(data_in, link_type=LinkType.INPUT_CALC, link_label='lala-{}'.format(i))
+            c.add_incoming(data_in, 
+                    link_type=LinkType.INPUT_CALC,
+                    link_label='lala-{}'.format(i))
 
         # Creating output data to that calculation:
         douts = set() # Similar to dins, this is the set of data output pks
         for i in range(4):
             data_out = Data().store()
             douts.add(data_out.id)
-            data_out.add_incoming(c, link_type=LinkType.CREATE, link_label='lala-{}'.format(i))
+            data_out.add_incoming(c,
+                    link_type=LinkType.CREATE,
+                    link_label='lala-{}'.format(i))
         #print(draw_children
 
-        # adding another calculation, with one input from c's outputs, and one input from c's inputs
+        # adding another calculation, with one input from c's outputs,
+        # and one input from c's inputs
         c2 = CalculationNode().store()
         c2.add_incoming(data_in, link_type=LinkType.INPUT_CALC, link_label='b')
         c2.add_incoming(data_out, link_type=LinkType.INPUT_CALC, link_label='c')
@@ -145,18 +154,22 @@ class TestNodes(AiidaTestCase):
         # ALso here starting with a set that only contains the starting the calculation:
         es = get_entity_sets(node_ids=(c.id,))
         # Creating the rule for getting input nodes:
-        rule_in = UpdateRule(QueryBuilder().append(Node, tag='n').append(Node, with_outgoing='n'))
+        rule_in = UpdateRule(QueryBuilder().append(
+                Node, tag='n').append(
+                Node, with_outgoing='n'))
         # Creating the rule for getting output nodes
-        rule_out = UpdateRule(QueryBuilder().append(Node, tag='n').append(Node, with_incoming='n'))
+        rule_out = UpdateRule(QueryBuilder().append(
+                Node, tag='n').append(
+                Node, with_incoming='n'))
         #, edge_filters={'type':LinkType.CREATE.value}))
 
 
-        # I'm testing the input rule. Since I'm updating, I should the input and the calculation
-        # itself:
+        # I'm testing the input rule. Since I'm updating, I should
+        # have the input and the calculation itself:
         is_set = rule_in.run(es.copy())['nodes']._set
         self.assertEqual(is_set, dins.union({c.id}))
 
-        # Testing the output rule, also here, output + calculation is expected:
+        # Testing the output rule, also here, output + calculation c is expected:
         is_set = rule_out.run(es.copy())['nodes']._set
         self.assertEqual(is_set, douts.union({c.id}))
 
@@ -181,9 +194,12 @@ class TestNodes(AiidaTestCase):
         self.assertEqual(rsave.run(es.copy()), es.copy(with_data=False))
         # Whereas the stash contains the same data as the starting point:
         self.assertEqual(stash,es)
-        rs2 = RuleSequence((RuleSaveWalkers(stash), rule_in, RuleSetWalkers(stash) ,rule_out))
+        rs2 = RuleSequence((
+                RuleSaveWalkers(stash), rule_in,
+                RuleSetWalkers(stash) ,rule_out))
         is_set = rs2.run(es.copy())['nodes']._set
-        # NOw I test whether the stash does the right thing, namely not including c2 in the results:
+        # NOw I test whether the stash does the right thing,
+        # namely not including c2 in the results:
         self.assertEqual(is_set, douts.union(dins).union({c.id}))
     
         
@@ -193,7 +209,9 @@ class TestNodes(AiidaTestCase):
         qb = QueryBuilder()
         qb.append(Data, tag='predecessor')
         qb.append(ProcessNode, with_incoming='predecessor',
-                  edge_filters={'type': {'in': [LinkType.INPUT_CALC.value, LinkType.INPUT_WORK.value]}})
+                  edge_filters={'type': {'in': [
+                        LinkType.INPUT_CALC.value,
+                        LinkType.INPUT_WORK.value]}})
         rules.append(UpdateRule(qb))
     
         # CREATE/RETURN(ProcessNode, Data) - Forward
@@ -207,21 +225,27 @@ class TestNodes(AiidaTestCase):
         qb = QueryBuilder()
         qb.append(ProcessNode, tag='predecessor')
         qb.append(ProcessNode, with_incoming='predecessor',
-            edge_filters={'type': {'in': [LinkType.CALL_CALC.value, LinkType.CALL_WORK.value]}})
+            edge_filters={'type': {'in': [
+                    LinkType.CALL_CALC.value,
+                    LinkType.CALL_WORK.value]}})
         rules.append(UpdateRule(qb))
     
         # CREATE(ProcessNode, Data) - Reversed
         if create_reversed:
             qb = QueryBuilder()
             qb.append(ProcessNode, tag='predecessor', project=['id'])
-            qb.append(Data, with_incoming='predecessor', edge_filters={'type': {'in': [LinkType.CREATE.value]}})
+            qb.append(Data, 
+                    with_incoming='predecessor',
+                    edge_filters={'type': {'in': [LinkType.CREATE.value]}})
             rules.append(UpdateRule(qb))
         # Case 3:
         # RETURN(ProcessNode, Data) - Reversed
         if return_reversed:
             qb = QueryBuilder()
             qb.append(ProcessNode, tag='predecessor',)
-            qb.append(Data, output_of='predecessor', edge_filters={'type': {'in': [LinkType.RETURN.value]}})
+            qb.append(Data,
+                    output_of='predecessor',
+                    edge_filters={'type': {'in': [LinkType.RETURN.value]}})
             rules.append(UpdateRule(qb))
     
     
@@ -243,7 +267,8 @@ class TestGroups(AiidaTestCase):
         nodes = []
         for inode in range(1, self.N_GROUPS):
             d = Data().store()
-            # The node I create, I added both to the group of same index and the group of index - 1
+            # The node I create, I added both to the group of
+            # same index and the group of index - 1
             groups[inode].add_nodes(d)
             groups[inode-1].add_nodes(d)
             nodes.append(d)
@@ -252,13 +277,14 @@ class TestGroups(AiidaTestCase):
         nodes_set = set([n.id for n in nodes])
         groups_set = set([g.id for g in groups])
 
-        # Now I want rule that gives me all the data starting from the last node, with links being
+        # Now I want rule that gives me all the data starting
+        # from the last node, with links being
         # belonging to the same group:
         qb = QueryBuilder()
         qb.append(Data, tag='d')
-        qb.append(Group, with_node='d', tag='g', filters={'type':''} ) # The filter is there for
-        # avoiding problems with autogrouping. Depending how the test exactly is run, nodes
-        # can be put into autogroups.
+        qb.append(Group, with_node='d', tag='g', filters={'type':''} ) # The filter here is
+        # there for avoiding problems with autogrouping. Depending how the test
+        # exactly is run, nodes can be put into autogroups.
         qb.append(Data, with_group='g')
 
         es = get_entity_sets(node_ids=(d.id,))
@@ -270,20 +296,22 @@ class TestGroups(AiidaTestCase):
         self.assertEqual(rule.get_visits()['nodes']._set,res)
 
         # I can do the same with 2 rules chained into a RuleSequence:
-        qb1=QueryBuilder().append(Node, tag='n').append(Group, with_node='n', filters={'type':''})
-        qb2=QueryBuilder().append(Group, tag='n').append(Node, with_group='n')
+        qb1=QueryBuilder().append(Node, tag='n').append(
+                Group, with_node='n', filters={'type':''})
+        qb2=QueryBuilder().append(Group, tag='n').append(
+                Node, with_group='n')
         rule1 = UpdateRule(qb1)
         rule2 = UpdateRule(qb2)
         seq = RuleSequence((rule1, rule2), max_iterations=np.inf)
         res = seq.run(es.copy())
-        for should_set, is_set  in ((nodes_set.copy(), res['nodes']._set), (groups_set,res['groups']._set)):
+        for should_set, is_set in (
+                (nodes_set.copy(), res['nodes']._set),
+                (groups_set,res['groups']._set)):
             self.assertEqual(is_set, should_set)
-        
-    
-    
-    
+
+
 if __name__ == '__main__':
-    from unittest import TestSuite
+    from unittest import TestSuite, TextTestRunner
     try:
         check_if_tests_can_run()
     except TestsNotAllowedError as e:
@@ -293,4 +321,4 @@ if __name__ == '__main__':
     test_suite = TestSuite()
     test_suite.addTest(TestNodes())
     test_suite.addTest(TestGroups())
-    results = unittest.TextTestRunner(failfast=False, verbosity=2).run(test_suite)
+    results = TextTestRunner(failfast=False, verbosity=2).run(test_suite)

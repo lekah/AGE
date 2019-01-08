@@ -9,7 +9,7 @@ import numpy as np
 
 import six
 
-from entities import AiidaEntitySets
+from entities import Basket
 
 MODES = Enumerate(('APPEND', 'REPLACE'))
 
@@ -28,7 +28,7 @@ class Operation(object):
     def _init_run(self, entity_set):
         pass
     def _check(self, entity_set):
-        if not isinstance(entity_set, AiidaEntitySets):
+        if not isinstance(entity_set, Basket):
             raise TypeError("You need to set the walkers with an AiidaEntitySet")
 
     def set_max_iterations(self, max_iterations):
@@ -103,7 +103,8 @@ class Operation(object):
         return self._walkers
         
         if self._mode == MODES.APPEND:
-            # The visited_set is all the instances I visited during the application of this rule.
+            # The visited_set is all the instances I visited during the
+            # application of this rule.
             # Basically a memory of all the vertices traversed
             visited_set = entity_set.copy()
             while (operational_set and iterations < self._maxiter):
@@ -118,8 +119,8 @@ class Operation(object):
                 new_set = self._get_result(new_set, operational_set )
                 operational_set = new_set
                 if not new_set:
-                    # I don't have anything in my new set, so it will be empty queries hencon
-                    # I can break the loop here
+                    # I don't have anything in my new set, so it will
+                    # be empty queries hencon. I can break the loop here
                     break
             return new_set
         else:
@@ -137,7 +138,8 @@ class UpdateRule(Operation):
             elif queryhelp['path'][idx]['type'] == 'group':
                 return 'groups'
             else:
-                raise Exception("not understood entity from ( {} )".format(queryhelp['path'][0]['type']))
+                raise Exception("not understood entity from ( {} )".format(
+                        queryhelp['path'][0]['type']))
                 
         queryhelp = querybuilder.get_json_compatible_queryhelp()
         for pathspec in queryhelp['path']:
@@ -178,7 +180,10 @@ class UpdateRule(Operation):
         for tag, projectio in self._querybuilder._projections.items():
             self._querybuilder._projections[tag] = []
         # priming querybuilder to add projection on the key I need:
-        self._querybuilder.add_projection(self._last_tag, entity_set[self._entity_to].identifier)
+        self._querybuilder.add_projection(
+                self._last_tag,
+                entity_set[self._entity_to].identifier
+            )
 
 
 

@@ -250,6 +250,8 @@ class Operation(object):
         self._track_visits = track_visits
         self._walkers = None
         self._visits = None
+        self._iterations_done = None
+
     def _init_run(self, entity_set):
         pass
     def _check(self, entity_set):
@@ -266,6 +268,9 @@ class Operation(object):
     def set_walkers(self, walkers):
         self._check(walkers)
         self._walkers = walkers
+
+    def get_iterations_done(self):
+        return self._iterations_done
 
     def get_walkers(self):
         return self._walkers #.copy(with_data=True)
@@ -314,7 +319,7 @@ class Operation(object):
             active_walkers = new_results - visited_this_rule
             # The visited is augmented:
             visited_this_rule += active_walkers
-
+        self._iterations_done = iterations
         if self._mode == MODES.APPEND:
             self._walkers += visited_this_rule
         elif self._mode == MODES.REPLACE:

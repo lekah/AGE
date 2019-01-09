@@ -53,7 +53,6 @@ def create_tree(max_depth=3, branching=3, starting_cls=Data, draw=False):
         previous_cls = cls
 
     if draw:
-        raw_input(draw)
         from aiida.utils.ascii_vis import draw_children
         print('\n\n\n The tree created:')
         print(draw_children(parent, dist=max_depth+1,

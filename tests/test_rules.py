@@ -32,7 +32,10 @@ class TestNodes(AiidaTestCase):
         Attaching a sequence of Calculation/Data to create a "provenance".
         """
         from age.utils import create_tree
-        parent, desc_dict, _ = create_tree(self.DEPTH, self.NR_OF_CHILDREN)
+        created_dict = create_tree(self.DEPTH, self.NR_OF_CHILDREN)
+        parent = created_dict['parent']
+        desc_dict = created_dict['depth_dict']
+
         # Created all the nodes, tree. 
         #Now testing whether I find all the descendants
         # Using the utility function to create the starting entity set:
@@ -264,6 +267,40 @@ class TestGroups(AiidaTestCase):
                 (groups_set,res['groups']._set)):
             self.assertEqual(is_set, should_set)
 
+class TestEdges(AiidaTestCase):
+    DEPTH = 3
+    NR_OF_CHILDREN = 2
+
+    def runTest(self):
+        """
+        Testing whether nodes (and nodes) can be traversed with the Graph explorer,
+        with the links being stored
+        """
+        from age.utils import create_tree
+        # I create a certain number of groups and save them in this list:
+        created_dict = create_tree(self.DEPTH, self.NR_OF_CHILDREN, draw=True)
+        es = get_entity_sets(node_ids=(created_dict['parent'].id,))
+        qb = QueryBuilder().append(Node).append(Node)
+
+        depth = self.DEPTH-1
+        rule = UpdateRule(qb, mode=MODES.REPLACE, max_iterations=depth)
+        res = rule.run(es.copy())
+        #print('   Replace-mode results: {}'.format(', '.join(map(str, sorted(res)))))
+        should_set = created_dict['depth_dict'][depth]
+        self.assertEqual(res['nodes']._set, should_set)
+        # ~ print (res._dict.keys())
+        return
+
+        rule = UpdateRule(qb, mode=MODES.APPEND, max_iterations=depth)
+        res = rule.run(es.copy())['nodes']._set
+        #print('   Append-mode  results: {}'.format(', '.join(map(str, sorted(res)))))
+        should_set = set()
+        [[should_set.add(s) for s in created_dict['depth_dict'][d]] for d in range(depth+1)]
+
+        self.assertTrue(not(res.difference(should_set) or should_set.difference(res)))
+
+
+
 
 if __name__ == '__main__':
     from unittest import TestSuite, TextTestRunner
@@ -276,4 +313,5 @@ if __name__ == '__main__':
     test_suite = TestSuite()
     test_suite.addTest(TestNodes())
     test_suite.addTest(TestGroups())
+    test_suite.addTest(TestEdges())
     results = TextTestRunner(failfast=False, verbosity=2).run(test_suite)

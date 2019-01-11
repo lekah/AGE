@@ -1,50 +1,39 @@
+
+from abc import ABCMeta, abstractmethod
+
 from aiida.orm import Node, Group
 
-VALID_CLASSES = (Node, Group)
+import six
 
-class AiidaEntitySet(object):
-    """
-    Instances of this class reference a subset of entities in a databases
-    via a unique identifier.
-    There are also a few operators defined, for simplicity,
-    to do set-additions (unions) and deletions.
-    The underlying Python-class is **set**, which means that adding an instance
-    again to an AiidaEntitySet will not create a duplicate.
-    """
-    def __init__(self, aiida_cls):
-        """
-        :param aiida_cls: A valid AiiDA ORM class, i.e. Node, Group, Computer
-        """
-        if not aiida_cls in VALID_CLASSES:
-            raise TypeError("aiida_cls has to be among:{}".format(
-                    VALID_CLASSES))
-        # Done with checks, saving to attributes:
-        self._aiida_cls = aiida_cls
-        # The _set is the set where keys are set:
-        self._set = set()
-        # the identifier for the key, when I get instance classes
-        # it has a type that I check as well
-        self._identifier ='id' # TODO: Customize this,
-        # uuid or name (for groups) could also work
-        self._identifier_type = int # and this as well.
+VALID_ENTITY_CLASSES = (Node, Group)
 
-    def __len__(self):
-        return len(self._set)
-
+@six.add_metaclass(ABCMeta)
+class AbstractSetContainer(set):
+    @abstractmethod
     def _check_self_and_other(self, other):
         """
         Utility function. When called, will check whether self and other instance
-        are compatible. Same aiida classes, same identifiers, etc...
+        are compatible. Same aiida classes, same identifiers, length of tuples...
         """
-        if not isinstance(other, AiidaEntitySet):
-            raise TypeError("Other class is not an instance of AiidaEntitySet")
-        if self.aiida_cls != other.aiida_cls:
-            raise TypeError("The two instances do not have the same aiida type!")
-        if self.identifier != other.identifier:
-            raise ValueError("The two instances do not have the same identifier!")
-        if self._identifier_type != other._identifier_type:
-            raise TypeError("The two instances do not have the same identifier type!")
-        return True
+        pass
+
+    @abstractmethod
+    def _check_input_for_set(self, input_for_set):
+        """
+        When giving me something to the set, this utility function can be used
+        to do the right thing.
+        """
+        pass
+
+    @abstractmethod
+    def copy(self):
+        """
+        Copy
+        """
+        pass
+
+    def __len__(self):
+        return len(self._set)
 
     def __add__(self, other):
         """
@@ -97,31 +86,6 @@ class AiidaEntitySet(object):
     def __ne__(self,  other):
         return not(self==other)
 
-    @property
-    def identifier(self):
-        return self._identifier
-
-    @property
-    def aiida_cls(self):
-        return self._aiida_cls
-
-
-    def _check_input_for_set(self, input_for_set):
-        """
-        When giving me something to the set, this utility function can be used
-        to do the right thing.
-        """
-        if isinstance(input_for_set, self._aiida_cls):
-            return getattr(input_for_set, self._identifier)
-        elif isinstance(input_for_set, self._identifier_type):
-            return input_for_set
-        else:
-            raise ValueError("{} is not a valid input\n"
-                "You can either pass an AiiDA instance or a key to an instance that"
-                "matches the identifier you defined ({})".format(
-                        input_for_set,
-                        self._identifier_type))
-
     def set_entities(self, new_entitites):
         """
         Replacing my set with the new entities, given by their identifier.
@@ -150,6 +114,155 @@ class AiidaEntitySet(object):
         Nulls the set
         """
         self._set = set()
+
+class AiidaEntitySet(AbstractSetContainer):
+    """
+    Instances of this class reference a subset of entities in a databases
+    via a unique identifier.
+    There are also a few operators defined, for simplicity,
+    to do set-additions (unions) and deletions.
+    The underlying Python-class is **set**, which means that adding an instance
+    again to an AiidaEntitySet will not create a duplicate.
+    """
+    def __init__(self, aiida_cls):
+        """
+        :param aiida_cls: A valid AiiDA ORM class, i.e. Node, Group, Computer
+        """
+        if not aiida_cls in VALID_ENTITY_CLASSES:
+            raise TypeError("aiida_cls has to be among:{}".format(
+                    VALID_ENTITY_CLASSES))
+        # Done with checks, saving to attributes:
+        self._aiida_cls = aiida_cls
+        # The _set is the set where keys are set:
+        self._set = set()
+        # the identifier for the key, when I get instance classes
+        # it has a type that I check as well
+        self._identifier ='id' # TODO: Customize this,
+        # uuid or name (for groups) could also work
+        self._identifier_type = int # and this as well.
+
+
+    def _check_self_and_other(self, other):
+        """
+        Utility function. When called, will check whether self and other instance
+        are compatible. Same aiida classes, same identifiers, etc...
+        """
+        if not isinstance(other, AiidaEntitySet):
+            raise TypeError("Other class is not an instance of AiidaEntitySet")
+        if self.aiida_cls != other.aiida_cls:
+            raise TypeError("The two instances do not have the same aiida type!")
+        if self.identifier != other.identifier:
+            raise ValueError("The two instances do not have the same identifier!")
+        if self._identifier_type != other._identifier_type:
+            raise TypeError("The two instances do not have the same identifier type!")
+        return True
+
+
+    @property
+    def identifier(self):
+        return self._identifier
+
+    @property
+    def aiida_cls(self):
+        return self._aiida_cls
+
+
+    def _check_input_for_set(self, input_for_set):
+        """
+        When giving me something to the set, this utility function can be used
+        to do the right thing.
+        """
+        if isinstance(input_for_set, self._aiida_cls):
+            return getattr(input_for_set, self._identifier)
+        elif isinstance(input_for_set, self._identifier_type):
+            return input_for_set
+        else:
+            raise ValueError("{} is not a valid input\n"
+                "You can either pass an AiiDA instance or a key to an instance that"
+                "matches the identifier you defined ({})".format(
+                        input_for_set,
+                        self._identifier_type))
+
+
+    def copy(self, with_data=True):
+        """
+        Create a new instance, with the attributes defining being the same.
+        :param bool with_data: Whether to copy also the data.
+        """
+        new = AiidaEntitySet(aiida_cls=self.aiida_cls) #
+        #  , identifier=self.identifier, identifier_type=self._identifier_type)
+        if with_data:
+            new._set_key_set_nocheck(self._set.copy())
+        return new
+
+class AiidaEdgeSet(AbstractSetContainer):
+    """
+    Instances of this class reference a subset of edges in a databases
+    via the unique identifiers.
+    The underlying Python-class is **set**, which means that adding an instance
+    again to an AiidaEntitySet will not create a duplicate.
+    """
+    def __init__(self, aiida_cls_to, aiida_cls_from):
+        """
+        :param aiida_cls: A valid AiiDA ORM class, i.e. Node, Group, Computer
+        """
+        for aiida_cls in (aiida_cls_to,  aiida_cls_from):
+            if not aiida_cls in VALID_CLASSES:
+                raise TypeError("aiida_cls has to be among:{}".format(
+                        VALID_CLASSES))
+        # Done with checks, saving to attributes:
+        self._aiida_cls_to = aiida_cls_to
+        self._aiida_cls_from = aiida_cls_from
+        # The _set is the set where keys are set:
+        self._set = set()
+        # the identifier for the key, when I get instance classes
+        # it has a type that I check as well
+        self._identifier ='id' # TODO: Customize this,
+        # uuid or name (for groups) could also work
+        self._identifier_type = int # and this as well.
+
+
+    def _check_self_and_other(self, other):
+        """
+        Utility function. When called, will check whether self and other instance
+        are compatible. Same aiida classes, same identifiers, etc...
+        """
+        if not isinstance(other, AiidaEntitySet):
+            raise TypeError("Other class is not an instance of AiidaEntitySet")
+        if self.aiida_cls != other.aiida_cls:
+            raise TypeError("The two instances do not have the same aiida type!")
+        if self.identifier != other.identifier:
+            raise ValueError("The two instances do not have the same identifier!")
+        if self._identifier_type != other._identifier_type:
+            raise TypeError("The two instances do not have the same identifier type!")
+        return True
+
+
+    @property
+    def identifier(self):
+        return self._identifier
+
+    @property
+    def aiida_cls(self):
+        return self._aiida_cls
+
+
+    def _check_input_for_set(self, input_for_set):
+        """
+        When giving me something to the set, this utility function can be used
+        to do the right thing.
+        """
+        if isinstance(input_for_set, self._aiida_cls):
+            return getattr(input_for_set, self._identifier)
+        elif isinstance(input_for_set, self._identifier_type):
+            return input_for_set
+        else:
+            raise ValueError("{} is not a valid input\n"
+                "You can either pass an AiiDA instance or a key to an instance that"
+                "matches the identifier you defined ({})".format(
+                        input_for_set,
+                        self._identifier_type))
+
 
     def copy(self, with_data=True):
         """

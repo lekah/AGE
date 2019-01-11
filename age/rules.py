@@ -1,5 +1,5 @@
 
-from abc import ABCMeta
+from abc import ABCMeta, abstractmethod
 
 from aiida.common.extendeddicts import Enumerate
 from aiida.orm import Node, Group
@@ -27,6 +27,7 @@ class Operation(object):
 
     def _init_run(self, entity_set):
         pass
+
     def _check(self, entity_set):
         if not isinstance(entity_set, Basket):
             raise TypeError("You need to set the walkers with an AiidaEntitySet")
@@ -140,7 +141,8 @@ class UpdateRule(Operation):
             else:
                 raise Exception("not understood entity from ( {} )".format(
                         queryhelp['path'][0]['type']))
-                
+
+
         queryhelp = querybuilder.get_json_compatible_queryhelp()
         for pathspec in queryhelp['path']:
             if not pathspec['type']:
@@ -177,7 +179,7 @@ class UpdateRule(Operation):
 
     def _init_run(self, entity_set):
         # Removing all other projections in the QueryBuilder instance:
-        for tag, projectio in self._querybuilder._projections.items():
+        for tag in self._querybuilder._projections.keys():
             self._querybuilder._projections[tag] = []
         # priming querybuilder to add projection on the key I need:
         self._querybuilder.add_projection(

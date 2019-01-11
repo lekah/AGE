@@ -268,7 +268,7 @@ class TestGroups(AiidaTestCase):
             self.assertEqual(is_set, should_set)
 
 class TestEdges(AiidaTestCase):
-    DEPTH = 3
+    DEPTH = 4
     NR_OF_CHILDREN = 2
 
     def runTest(self):
@@ -279,7 +279,12 @@ class TestEdges(AiidaTestCase):
         from age.utils import create_tree
         # I create a certain number of groups and save them in this list:
         created_dict = create_tree(self.DEPTH, self.NR_OF_CHILDREN, draw=True)
+        instances = created_dict['instances']
+        adjacency = created_dict['adjacency']
+
         es = get_entity_sets(node_ids=(created_dict['parent'].id,))
+
+
         qb = QueryBuilder().append(Node).append(Node)
 
         rule = UpdateRule(qb, mode=MODES.APPEND, max_iterations=self.DEPTH-1)
@@ -290,12 +295,30 @@ class TestEdges(AiidaTestCase):
 
         self.assertEqual(res['nodes']._set, should_set) #) or should_set.difference(res)))
 
-        instances = created_dict['instances']
-        adjacency = created_dict['adjacency']
 
         touples_should = set((instances[i],instances[j]) for  i, j in zip(*np.where(adjacency)))
         touples_are = set(zip(*zip(*res['nodes_nodes']._set)[:2]))
 
+        self.assertEqual(touples_are, touples_should)
+
+
+        rule = UpdateRule(qb, mode=MODES.REPLACE, max_iterations=self.DEPTH-1)
+        res = rule.run(es.copy())
+        # Since I apply the replace rule, the last set of links should appear:
+
+        instances = created_dict['instances']
+        adjacency = created_dict['adjacency']
+
+        touples_should = set()
+        [touples_should.add((pk1, pk2))
+                for idx1,pk1 in enumerate(instances)
+                for idx2,pk2 in enumerate(instances)
+                if adjacency[idx1, idx2]
+                and pk1 in created_dict['depth_dict'][self.DEPTH-2]
+                and pk2 in created_dict['depth_dict'][self.DEPTH-1]
+            ]
+
+        touples_are = set(zip(*zip(*res['nodes_nodes']._set)[:2]))
         self.assertEqual(touples_are, touples_should)
 
 if __name__ == '__main__':

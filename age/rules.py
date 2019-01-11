@@ -1,6 +1,7 @@
 
 from abc import ABCMeta, abstractmethod
 
+from aiida.common.exceptions import InputValidationError
 from aiida.common.extendeddicts import Enumerate
 from aiida.orm import Node, Group
 from aiida.orm.querybuilder import QueryBuilder
@@ -93,6 +94,7 @@ class Operation(object):
             active_walkers = new_results - visited_this_rule
             # The visited is augmented:
             visited_this_rule += active_walkers
+
         self._iterations_done = iterations
         if self._mode == MODES.APPEND:
             self._walkers += visited_this_rule
@@ -130,7 +132,7 @@ class Operation(object):
 
 class UpdateRule(Operation):
     def __init__(self, querybuilder, mode=MODES.APPEND, max_iterations=1,
-            track_edges=False, track_visits=True):
+            track_edges=True, track_visits=True):
         def get_spec_from_path(queryhelp, idx):
             if (queryhelp['path'][idx]['type'].startswith('node') or
                     queryhelp['path'][idx]['type'].startswith('data') or
@@ -157,6 +159,28 @@ class UpdateRule(Operation):
         super(UpdateRule, self).__init__(mode, max_iterations, 
                 track_edges=track_edges, track_visits=track_visits)
 
+    def _init_run(self, entity_set):
+        # Removing all other projections in the QueryBuilder instance:
+        for tag in self._querybuilder._projections.keys():
+            self._querybuilder._projections[tag] = []
+        # priming querybuilder to add projection on the key I need:
+        self._querybuilder.add_projection(self._last_tag,
+                entity_set[self._entity_to].identifier)
+        self._entity_to_identifier = entity_set[self._entity_to].identifier
+        if self._track_edges:
+            self._querybuilder.add_projection(self._first_tag,
+                entity_set[self._entity_to].identifier)
+            edge_set = entity_set._dict['{}_{}'.format(self._entity_from, self._entity_to)]
+            self._edge_label = '{}--{}'.format(self._first_tag, self._last_tag)
+            self._edge_keys = tuple([
+                (self._first_tag, entity_set[self._entity_from].identifier),
+                (self._last_tag, entity_set[self._entity_to].identifier)] + [
+                (self._edge_label, identifier) for identifier in edge_set._additional_identifiers])
+            try:
+                self._querybuilder.add_projection(self._edge_label, edge_set._additional_identifiers)
+            except InputValidationError as e:
+                raise KeyError("The key for the edge is invalid.\n"
+                        "Are the entities really connected, or have you overwritten the edge-tag?")
 
     def _load_results(self, target_set, operational_set):
         """
@@ -170,22 +194,18 @@ class UpdateRule(Operation):
         if primkeys:
             self._querybuilder.add_filter(self._first_tag, {
                         operational_set[self._entity_from].identifier:{'in':primkeys}})
+            qres = self._querybuilder.dict()
             # These are the new results returned by the query
             target_set[self._entity_to].add_entities(
-                        [item[self._last_tag][operational_set[self._entity_to].identifier] 
-                            for item in self._querybuilder.iterdict()])
+                        [item[self._last_tag][self._entity_to_identifier] 
+                        for item in qres])
+            if self._track_edges:
+                target_set['{}_{}'.format(self._entity_to, self._entity_to)].add_entities(
+                    [tuple(item[key1][key2] for (key1, key2) in self._edge_keys) 
+                    for item in qres])
         # Everything is changed in place, no need to return anything
 
 
-    def _init_run(self, entity_set):
-        # Removing all other projections in the QueryBuilder instance:
-        for tag in self._querybuilder._projections.keys():
-            self._querybuilder._projections[tag] = []
-        # priming querybuilder to add projection on the key I need:
-        self._querybuilder.add_projection(
-                self._last_tag,
-                entity_set[self._entity_to].identifier
-            )
 
 
 

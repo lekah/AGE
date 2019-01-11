@@ -44,7 +44,7 @@ class AbstractSetContainer(set):
             c = a+b # new set that contains everything in a and b
         """
         self._check_self_and_other(other)
-        new = AiidaEntitySet(self.aiida_cls) # , identifier=self.identifier)
+        new = self.copy(with_data=False) # , identifier=self.identifier)
         new._set_key_set_nocheck(self._set.union(other._set))
         return new
 
@@ -65,7 +65,7 @@ class AbstractSetContainer(set):
         Subtraction, defined as the set-difference between two entities
         """
         self._check_self_and_other(other)
-        new = AiidaEntitySet(self.aiida_cls) #, identifier=self.identifier)
+        new = self.copy(with_data=False) #, identifier=self.identifier)
         new._set_key_set_nocheck(self._set.difference(other._set))
         return new
 
@@ -195,19 +195,20 @@ class AiidaEntitySet(AbstractSetContainer):
             new._set_key_set_nocheck(self._set.copy())
         return new
 
-class AiidaEdgeSet(AbstractSetContainer):
+
+class DirectedEdgeSet(AbstractSetContainer):
     """
     Instances of this class reference a subset of edges in a databases
     via the unique identifiers.
     The underlying Python-class is **set**, which means that adding an instance
     again to an AiidaEntitySet will not create a duplicate.
     """
-    def __init__(self, aiida_cls_to, aiida_cls_from):
+    def __init__(self, aiida_cls_to, aiida_cls_from, additional_identifiers=None):
         """
         :param aiida_cls: A valid AiiDA ORM class, i.e. Node, Group, Computer
         """
         for aiida_cls in (aiida_cls_to,  aiida_cls_from):
-            if not aiida_cls in VALID_CLASSES:
+            if not aiida_cls in VALID_ENTITY_CLASSES:
                 raise TypeError("aiida_cls has to be among:{}".format(
                         VALID_CLASSES))
         # Done with checks, saving to attributes:
@@ -215,53 +216,49 @@ class AiidaEdgeSet(AbstractSetContainer):
         self._aiida_cls_from = aiida_cls_from
         # The _set is the set where keys are set:
         self._set = set()
-        # the identifier for the key, when I get instance classes
-        # it has a type that I check as well
-        self._identifier ='id' # TODO: Customize this,
-        # uuid or name (for groups) could also work
-        self._identifier_type = int # and this as well.
 
+        # the additional identifiers for the key
+        if additional_identifiers is None:
+            self._additional_identifiers = tuple()
+        elif not isinstance(additional_identifiers, (tuple,  list)):
+            raise TypeError('Identifiers need to be a list or tuple')
+        else:
+            self._additional_identifiers = tuple(additional_identifiers)
+
+        # The following attribute defines the edge specification that are enforced and stored,
+        # In addition to the primary keys that are stored anyway.
+        # I.e. for node to node this could be (type, label).
+        self._len_additional_identifiers = len(self._additional_identifiers)
+        self._len_all_identifiers = 2 + self._len_additional_identifiers
 
     def _check_self_and_other(self, other):
         """
         Utility function. When called, will check whether self and other instance
         are compatible. Same aiida classes, same identifiers, etc...
         """
-        if not isinstance(other, AiidaEntitySet):
+        if not isinstance(other, DirectedEdgeSet):
             raise TypeError("Other class is not an instance of AiidaEntitySet")
-        if self.aiida_cls != other.aiida_cls:
+        if self._aiida_cls_to != other._aiida_cls_to:
             raise TypeError("The two instances do not have the same aiida type!")
-        if self.identifier != other.identifier:
-            raise ValueError("The two instances do not have the same identifier!")
-        if self._identifier_type != other._identifier_type:
-            raise TypeError("The two instances do not have the same identifier type!")
+        if self._aiida_cls_from != other._aiida_cls_from:
+            raise TypeError("The two instances do not have the same aiida type!")
+        if self._additional_identifiers != other._additional_identifiers:
+            raise ValueError("The two instances do not have the same identifiers!")
         return True
-
-
-    @property
-    def identifier(self):
-        return self._identifier
-
-    @property
-    def aiida_cls(self):
-        return self._aiida_cls
-
 
     def _check_input_for_set(self, input_for_set):
         """
         When giving me something to the set, this utility function can be used
         to do the right thing.
         """
-        if isinstance(input_for_set, self._aiida_cls):
-            return getattr(input_for_set, self._identifier)
-        elif isinstance(input_for_set, self._identifier_type):
+        if isinstance(input_for_set, tuple):
+            if len(input_for_set) != self._len_all_identifiers:
+                raise ValueError("The tuple you passed has not the right length {} != {}".format(
+                    len(tuple), self._len_all_identfiers))
             return input_for_set
         else:
-            raise ValueError("{} is not a valid input\n"
-                "You can either pass an AiiDA instance or a key to an instance that"
-                "matches the identifier you defined ({})".format(
-                        input_for_set,
-                        self._identifier_type))
+            raise TypeError("{} is not a valid input\n"
+                "It has to be a tuple".format(input_for_set))
 
 
     def copy(self, with_data=True):
@@ -269,7 +266,8 @@ class AiidaEdgeSet(AbstractSetContainer):
         Create a new instance, with the attributes defining being the same.
         :param bool with_data: Whether to copy also the data.
         """
-        new = AiidaEntitySet(aiida_cls=self.aiida_cls) #
+        new = DirectedEdgeSet(aiida_cls_to=self._aiida_cls_to, aiida_cls_from=self._aiida_cls_from,
+                additional_identifiers=self._additional_identifiers) #
         #  , identifier=self.identifier, identifier_type=self._identifier_type)
         if with_data:
             new._set_key_set_nocheck(self._set.copy())
@@ -283,28 +281,62 @@ class Basket():
     In the current implementation, they contain a Node "set" and a Group "set".
     :TODO: Computers and Users!
     """
-    def __init__(self, nodes=None, groups=None):
+    def __init__(self, nodes=None, groups=None, nodes_nodes=None):
         """
         :param nodes: An AiidaEntitySet of Node
         :param groups: An AiidaEntitySet of Group
         """
-        if nodes is None:
-            nodes = AiidaEntitySet(Node) #, identifier='id', identifier_type=int)
-        elif isinstance(nodes, AiidaEntitySet):
-            pass
-        else:
-            raise TypeError("nodes has to be an instance of AiidaEntitySet")
-        if groups is None:
-            groups = AiidaEntitySet(Group) #, identifier='id', identifier_type=int)
-        elif isinstance(groups, AiidaEntitySet):
-            pass
-        else:
-            raise TypeError("groups has to be an instance of AiidaEntitySet")
-        for inp, should_cls in ((nodes, Node), (groups, Group)):
-            if not inp.aiida_cls == should_cls:
-                raise TypeError("{} does not have {} as its class, but {}".format(
-                        inp, should_cls, inp.aiida_cls))
-        self._dict = dict(nodes=nodes, groups=groups)
+        def get_check_set_entity_set(var, keyword, cls):
+            if var is None:
+                return AiidaEntitySet(cls)
+            if isinstance(var, AiidaEntitySet):
+                if var.aiida_cls is cls:
+                    return var
+                else:
+                    raise TypeError("{}  has to  have {} as aiida_cls".format(keyword, cls))
+            else:
+                raise TypeError("{} has to be an instance of AiidaEntitySet".format(keyword))
+
+        def get_check_set_directed_edge_set(var, keyword, cls_from, cls_to, 
+                additional_identifiers):
+            if var is None:
+                return DirectedEdgeSet(aiida_cls_to=cls_to, aiida_cls_from=cls_from, 
+                        additional_identifiers=additional_identifiers)
+            if isinstance(var, DirectedEdgeSet):
+                if var._aiida_cls_from is not cls_from:
+                    raise TypeError("{} has to  have {} as aiida_cls_from".format(keyword, cls_from))
+                elif var._aiida_cls_to is not cls_to:
+                    raise TypeError("{} has to  have {} as aiida_cls_to".format(keyword, cls_to))
+                else:
+                    return var
+            else:
+                raise TypeError("{} has to be an instance of DirectedEdgeSet".format(keyword))
+
+        nodes = get_check_set_entity_set(nodes, 'nodes', Node)
+        groups = get_check_set_entity_set(groups, 'groups', Group)
+        nodes_nodes = get_check_set_directed_edge_set(nodes_nodes, 'nodes-nodes', Node, Node, 
+                additional_identifiers=('label', 'type'))
+
+
+        # ~ if nodes is None:
+            # ~ nodes = AiidaEntitySet(Node) #, identifier='id', identifier_type=int)
+        # ~ elif isinstance(nodes, AiidaEntitySet):
+            # ~ pass
+        # ~ else:
+            
+
+        # ~ if groups is None:
+            # ~ groups = AiidaEntitySet(Group) #, identifier='id', identifier_type=int)
+        # ~ elif isinstance(groups, AiidaEntitySet):
+            # ~ pass
+        # ~ else:
+            # ~ raise TypeError("groups has to be an instance of AiidaEntitySet")
+        # the Edges:
+        # ~ nodes_nodes = AiidaEdgeSet(Node, Node, additional_identifiers=('type', 'label'))
+        # ~ nodes_groups = AiidaEdgeSet(Node, Group, additional_identifiers=())
+        self._dict = dict(nodes=nodes, groups=groups, 
+                nodes_nodes=nodes_nodes, #nodes_groups=nodes_groups
+            )
 
     @property
     def sets(self):

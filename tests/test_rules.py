@@ -282,25 +282,21 @@ class TestEdges(AiidaTestCase):
         es = get_entity_sets(node_ids=(created_dict['parent'].id,))
         qb = QueryBuilder().append(Node).append(Node)
 
-        depth = self.DEPTH-1
-        rule = UpdateRule(qb, mode=MODES.REPLACE, max_iterations=depth)
+        rule = UpdateRule(qb, mode=MODES.APPEND, max_iterations=self.DEPTH-1)
         res = rule.run(es.copy())
-        #print('   Replace-mode results: {}'.format(', '.join(map(str, sorted(res)))))
-        should_set = created_dict['depth_dict'][depth]
-        self.assertEqual(res['nodes']._set, should_set)
-        # ~ print (res._dict.keys())
-        return
-
-        rule = UpdateRule(qb, mode=MODES.APPEND, max_iterations=depth)
-        res = rule.run(es.copy())['nodes']._set
         #print('   Append-mode  results: {}'.format(', '.join(map(str, sorted(res)))))
         should_set = set()
-        [[should_set.add(s) for s in created_dict['depth_dict'][d]] for d in range(depth+1)]
+        [[should_set.add(s) for s in created_dict['depth_dict'][d]] for d in range(self.DEPTH)]
 
-        self.assertTrue(not(res.difference(should_set) or should_set.difference(res)))
+        self.assertEqual(res['nodes']._set, should_set) #) or should_set.difference(res)))
 
+        instances = created_dict['instances']
+        adjacency = created_dict['adjacency']
 
+        touples_should = set((instances[i],instances[j]) for  i, j in zip(*np.where(adjacency)))
+        touples_are = set(zip(*zip(*res['nodes_nodes']._set)[:2]))
 
+        self.assertEqual(touples_are, touples_should)
 
 if __name__ == '__main__':
     from unittest import TestSuite, TextTestRunner
@@ -311,7 +307,7 @@ if __name__ == '__main__':
         sys.exit(1)
 
     test_suite = TestSuite()
-    test_suite.addTest(TestNodes())
-    test_suite.addTest(TestGroups())
+    # ~ test_suite.addTest(TestNodes())
+    # ~ test_suite.addTest(TestGroups())
     test_suite.addTest(TestEdges())
     results = TextTestRunner(failfast=False, verbosity=2).run(test_suite)

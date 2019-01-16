@@ -132,7 +132,7 @@ class Operation(object):
 
 class UpdateRule(Operation):
     def __init__(self, querybuilder, mode=MODES.APPEND, max_iterations=1,
-            track_edges=True, track_visits=True):
+            track_edges=False, track_visits=True):
         def get_spec_from_path(queryhelp, idx):
             if (queryhelp['path'][idx]['type'].startswith('node') or
                     queryhelp['path'][idx]['type'].startswith('data') or

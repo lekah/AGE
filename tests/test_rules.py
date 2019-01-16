@@ -77,8 +77,6 @@ class TestNodes(AiidaTestCase):
         es = get_entity_sets(node_ids=(d.id,))
         res = rule.run(es)
         self.assertEqual( res['nodes']._set, set([d.id, c.id]))
-        # I should have done 2 iterations:
-        self.assertEqual(rule.get_iterations_done(), 2)
 
     
     
@@ -291,7 +289,7 @@ class TestEdges(AiidaTestCase):
 
         qb = QueryBuilder().append(Node).append(Node)
 
-        rule = UpdateRule(qb, mode=MODES.APPEND, max_iterations=self.DEPTH-1)
+        rule = UpdateRule(qb, mode=MODES.APPEND, max_iterations=self.DEPTH-1, track_edges=True)
         res = rule.run(es.copy())
         #print('   Append-mode  results: {}'.format(', '.join(map(str, sorted(res)))))
         should_set = set()
@@ -306,7 +304,7 @@ class TestEdges(AiidaTestCase):
         self.assertEqual(touples_are, touples_should)
 
 
-        rule = UpdateRule(qb, mode=MODES.REPLACE, max_iterations=self.DEPTH-1)
+        rule = UpdateRule(qb, mode=MODES.REPLACE, max_iterations=self.DEPTH-1, track_edges=True)
         res = rule.run(es.copy())
         # Since I apply the replace rule, the last set of links should appear:
 
@@ -334,7 +332,7 @@ if __name__ == '__main__':
         sys.exit(1)
 
     test_suite = TestSuite()
-    # ~ test_suite.addTest(TestNodes())
-    # ~ test_suite.addTest(TestGroups())
+    test_suite.addTest(TestNodes())
+    test_suite.addTest(TestGroups())
     test_suite.addTest(TestEdges())
     results = TextTestRunner(failfast=False, verbosity=2).run(test_suite)

@@ -1,5 +1,5 @@
 
-from age.entities import get_entity_sets
+from age.entities import get_basket
 from age.rules import (UpdateRule, RuleSequence, MODES, RuleSaveWalkers, RuleSetWalkers)
 
 from aiida.backends.testbase import AiidaTestCase, check_if_tests_can_run
@@ -43,7 +43,7 @@ class TestNodes(AiidaTestCase):
         # Created all the nodes, tree. 
         #Now testing whether I find all the descendants
         # Using the utility function to create the starting entity set:
-        es = get_entity_sets(node_ids=(parent.id,))
+        es = get_basket(node_ids=(parent.id,))
         qb = QueryBuilder().append(Node).append(Node)
 
         for depth in range(0, self.DEPTH):
@@ -74,7 +74,7 @@ class TestNodes(AiidaTestCase):
         d.add_incoming(c, link_type=LinkType.RETURN, link_label='lala')
         qb = QueryBuilder().append(Node).append(Node)
         rule = UpdateRule(qb, max_iterations=np.inf)
-        es = get_entity_sets(node_ids=(d.id,))
+        es = get_basket(node_ids=(d.id,))
         res = rule.run(es)
         self.assertEqual( res['nodes']._set, set([d.id, c.id]))
 
@@ -112,7 +112,7 @@ class TestNodes(AiidaTestCase):
 
 
         # ALso here starting with a set that only contains the starting the calculation:
-        es = get_entity_sets(node_ids=(c.id,))
+        es = get_basket(node_ids=(c.id,))
         # Creating the rule for getting input nodes:
         rule_in = UpdateRule(QueryBuilder().append(
                 Node, tag='n').append(
@@ -247,7 +247,7 @@ class TestGroups(AiidaTestCase):
         # exactly is run, nodes can be put into autogroups.
         qb.append(Data, with_group='g')
 
-        es = get_entity_sets(node_ids=(d.id,))
+        es = get_basket(node_ids=(d.id,))
         rule = UpdateRule(qb, max_iterations=np.inf)
         res = rule.run(es.copy())['nodes']._set
         # checking whether this updateRule above really visits all the nodes I created:
@@ -284,7 +284,7 @@ class TestEdges(AiidaTestCase):
         instances = created_dict['instances']
         adjacency = created_dict['adjacency']
 
-        es = get_entity_sets(node_ids=(created_dict['parent'].id,))
+        es = get_basket(node_ids=(created_dict['parent'].id,))
 
 
         qb = QueryBuilder().append(Node).append(Node)

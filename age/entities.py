@@ -416,7 +416,7 @@ class Basket():
 
 
 
-def get_entity_sets(node_ids=None, group_ids=None, *args):
+def get_basket(node_ids=None, group_ids=None, *args):
     """
     Utility function to get an instance of Basket.
     :param node_ids: An iterable of node-ids (pks) that are wanted

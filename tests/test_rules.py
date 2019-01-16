@@ -22,10 +22,14 @@ class TestNodes(AiidaTestCase):
     NR_OF_CHILDREN = 2
 
     def runTest(self):
+        """
+        Just wrapping the other functions
+        """
         self.test_data_provenance()
         # ~ self.test_returns_calls()
         self.test_cycle()
         self.test_stash()
+
     def test_data_provenance(self):
         """
         Creating a parent (Data) node.

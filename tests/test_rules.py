@@ -7,8 +7,8 @@ from aiida.common.exceptions import TestsNotAllowedError
 from aiida.common.links import LinkType
 from aiida.orm import Node
 from aiida.orm.data import Data
-from aiida.orm.node.process import CalculationNode, WorkflowNode
-
+from aiida.orm.calculation import Calculation
+from aiida.orm.calculation.work import WorkCalculation
 
 import numpy as np
 
@@ -69,9 +69,12 @@ class TestNodes(AiidaTestCase):
         Creating a cycle: A data-instance is both input to and returned by a WorkFlowNode
         """
         d = Data().store()
-        c = WorkflowNode().store()
-        c.add_incoming(d, link_type=LinkType.INPUT_WORK, link_label='lala')
-        d.add_incoming(c, link_type=LinkType.RETURN, link_label='lala')
+        c = WorkCalculation().store()
+        # New provenance design branch
+        # ~ c.add_incoming(d, link_type=LinkType.INPUT_WORK, link_label='lala')
+        # ~ d.add_incoming(c, link_type=LinkType.RETURN, link_label='lala')
+        c.add_link_from(d, link_type=LinkType.INPUT, label='lala')
+        d.add_link_from(c, link_type=LinkType.RETURN, label='lala')
         qb = QueryBuilder().append(Node).append(Node)
         rule = UpdateRule(qb, max_iterations=np.inf)
         es = get_basket(node_ids=(d.id,))
@@ -85,30 +88,38 @@ class TestNodes(AiidaTestCase):
         Here I'm testing the 'stash'
         """
         # creatin a first calculation with 3 input data:
-        c = CalculationNode().store()
+        c = Calculation().store()
         dins = set() # To compare later, dins is a set of the input data pks.
         for i in range(3):
             data_in = Data().store()
             dins.add(data_in.id)
-            c.add_incoming(data_in, 
-                    link_type=LinkType.INPUT_CALC,
-                    link_label='lala-{}'.format(i))
+            # ~ c.add_incoming(data_in, 
+                    # ~ link_type=LinkType.INPUT_CALC,
+                    # ~ link_label='lala-{}'.format(i))
+            c.add_link_from(data_in, 
+                    link_type=LinkType.INPUT,
+                    label='lala-{}'.format(i))
 
         # Creating output data to that calculation:
         douts = set() # Similar to dins, this is the set of data output pks
         for i in range(4):
             data_out = Data().store()
             douts.add(data_out.id)
-            data_out.add_incoming(c,
+            # ~ data_out.add_incoming(c,
+                    # ~ link_type=LinkType.CREATE,
+                    # ~ link_label='lala-{}'.format(i))
+            data_out.add_link_from(c,
                     link_type=LinkType.CREATE,
-                    link_label='lala-{}'.format(i))
+                    label='lala-{}'.format(i))
         #print(draw_children
 
         # adding another calculation, with one input from c's outputs,
         # and one input from c's inputs
-        c2 = CalculationNode().store()
-        c2.add_incoming(data_in, link_type=LinkType.INPUT_CALC, link_label='b')
-        c2.add_incoming(data_out, link_type=LinkType.INPUT_CALC, link_label='c')
+        c2 = Calculation().store()
+        # ~ c2.add_incoming(data_in, link_type=LinkType.INPUT_CALC, link_label='b')
+        # ~ c2.add_incoming(data_out, link_type=LinkType.INPUT_CALC, link_label='c')
+        c2.add_link_from(data_in, link_type=LinkType.INPUT, label='b')
+        c2.add_link_from(data_out, link_type=LinkType.INPUT, label='c')
 
 
         # ALso here starting with a set that only contains the starting the calculation:
@@ -116,11 +127,15 @@ class TestNodes(AiidaTestCase):
         # Creating the rule for getting input nodes:
         rule_in = UpdateRule(QueryBuilder().append(
                 Node, tag='n').append(
-                Node, with_outgoing='n'))
+                Node, input_of='n'))
+        # ~ rule_in = UpdateRule(QueryBuilder().append(
+                # ~ Node, tag='n').append(
+                # ~ Node, with_outgoing='n'))
         # Creating the rule for getting output nodes
         rule_out = UpdateRule(QueryBuilder().append(
                 Node, tag='n').append(
-                Node, with_incoming='n'))
+                Node, output_of='n'))
+                # ~ Node, with_incoming='n'))
         #, edge_filters={'type':LinkType.CREATE.value}))
 
 
@@ -242,10 +257,12 @@ class TestGroups(AiidaTestCase):
         # belonging to the same group:
         qb = QueryBuilder()
         qb.append(Data, tag='d')
-        qb.append(Group, with_node='d', tag='g', filters={'type':''} ) # The filter here is
+        # ~ qb.append(Group, with_node='d', tag='g', filters={'type':''} ) # The filter here is
+        qb.append(Group, group_of='d', tag='g', filters={'type':''} ) # The filter here is
         # there for avoiding problems with autogrouping. Depending how the test
         # exactly is run, nodes can be put into autogroups.
-        qb.append(Data, with_group='g')
+        qb.append(Data, member_of='g')
+        # ~ qb.append(Data, with_group='g')
 
         es = get_basket(node_ids=(d.id,))
         rule = UpdateRule(qb, max_iterations=np.inf)
@@ -257,9 +274,11 @@ class TestGroups(AiidaTestCase):
 
         # I can do the same with 2 rules chained into a RuleSequence:
         qb1=QueryBuilder().append(Node, tag='n').append(
-                Group, with_node='n', filters={'type':''})
+                Group, group_of='n', filters={'type':''})
+                # ~ Group, with_node='n', filters={'type':''})
         qb2=QueryBuilder().append(Group, tag='n').append(
-                Node, with_group='n')
+                Node, member_of='n')
+                # ~ Node, with_group='n')
         rule1 = UpdateRule(qb1)
         rule2 = UpdateRule(qb2)
         seq = RuleSequence((rule1, rule2), max_iterations=np.inf)

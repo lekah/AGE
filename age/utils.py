@@ -1,5 +1,5 @@
 from aiida.orm.data import Data
-from aiida.orm.node.process import CalculationNode, WorkflowNode
+from aiida.orm.calculation import Calculation
 from aiida.common.links import LinkType
 import numpy as np
 
@@ -8,8 +8,8 @@ def create_tree(max_depth=3, branching=3, starting_cls=Data, draw=False):
     """
     
     """
-    if starting_cls not in (Data, CalculationNode):
-        raise TypeError("The starting_cls has to be either Data or CalculationNode")
+    if starting_cls not in (Data, Calculation):
+        raise TypeError("The starting_cls has to be either Data or Calculation")
 
     # The number of nodes I will create:
     nr_of_nodes = sum([branching**d for d in range(max_depth)])
@@ -40,8 +40,8 @@ def create_tree(max_depth=3, branching=3, starting_cls=Data, draw=False):
 
         # Here I decide what class to create this level of descendants, and what the
         # link type is:
-        cls = Data if previous_cls is CalculationNode else CalculationNode
-        ltype = LinkType.CREATE if cls is Data else LinkType.INPUT_CALC
+        cls = Data if previous_cls is Calculation else Calculation
+        ltype = LinkType.CREATE if cls is Data else LinkType.INPUT #_CALC
 
         # The new instances I create are saved in this list:
         new_ins = []
@@ -52,7 +52,8 @@ def create_tree(max_depth=3, branching=3, starting_cls=Data, draw=False):
             # every previous instances gets a certain number of children:
             for ioutgoing in range(branching):
                 new = cls().store()
-                new.add_incoming(pins, link_type=ltype, link_label='{}'.format(ioutgoing))
+                #new.add_incoming(pins, link_type=ltype, link_label='{}'.format(ioutgoing))
+                new.add_link_from(pins, link_type=ltype, label='{}'.format(ioutgoing))
                 new_ins.append(new)
                 all_instances[counter] = new.id
                 adjacency[pins_idx, counter] = 1
@@ -69,8 +70,9 @@ def create_tree(max_depth=3, branching=3, starting_cls=Data, draw=False):
     if draw:
         from aiida.utils.ascii_vis import draw_children
         print('\n\n\n The tree created:')
-        print(draw_children(parent, dist=max_depth+1,
-                follow_links_of_type=(LinkType.INPUT_CALC, LinkType.CREATE)))
+        print(draw_children(parent, dist=max_depth+1))
+                # ~ follow_links_of_type=(LinkType.INPUT_CALC, LinkType.CREATE)))
+                # ~ follow_links_of_type=(LinkType.INPUT, LinkType.CREATE)))
         print('\n\n\n')
 
     return {'parent':parent, 'depth_dict':depth_dict, 'instances':all_instances,

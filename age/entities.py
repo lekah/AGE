@@ -2,6 +2,7 @@
 from abc import ABCMeta, abstractmethod
 
 from aiida.orm import Node, Group
+from aiida.orm.querybuilder import QueryBuilder
 
 import six
 
@@ -77,7 +78,7 @@ class AbstractSetContainer(set):
         self._set = self._set.difference(other._set)
         return self
 
-    def __str__(self):
+    def __repr__(self):
         return '{{{}}}'.format( ','.join(map(str, self._set)))
 
     def __eq__(self,  other):
@@ -195,6 +196,13 @@ class AiidaEntitySet(AbstractSetContainer):
             new._set_key_set_nocheck(self._set.copy())
         return new
 
+    def get_entities(self):
+        """
+        Return the AiiDA entities
+        """
+        for entity, in  QueryBuilder().append(self._aiida_cls, project='*', 
+                filters={self._identifier:{'in':self._set}}).iterall():
+            yield entity
 
 class DirectedEdgeSet(AbstractSetContainer):
     """
@@ -394,12 +402,13 @@ class Basket():
     def __ne__(self, other):
         return not(self==other)
 
-    def __str__(self):
+    def __repr__(self):
         ret_str = ''
         for key, val in self._dict.items():
             ret_str += '  ' + key + ': '
             ret_str += str(val) + '\n'
         return ret_str
+
 
     def empty(self):
         """
